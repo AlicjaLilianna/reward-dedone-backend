@@ -1,20 +1,15 @@
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 import { ApolloServer } from '@apollo/server';
 import { startStandaloneServer } from '@apollo/server/standalone';
 import { GraphQLError } from 'graphql';
 import jwt from 'jsonwebtoken';
 import 'dotenv/config';
+import { MongoClient } from "mongodb";
 const JWT_SECRET = process.env.JWT_SECRET;
 const DEPLOYMENT = process.env.DEPLOYMENT;
 const APP_PORT = process.env.PORT;
+const MONGO_URI = process.env.MONGODB_URI;
+const client = new MongoClient(MONGO_URI);
+const db = client.db("task_db");
 const books = [
     {
         title: 'The Awakening',
@@ -37,16 +32,56 @@ const typeDefs = `#graphql
     author: String
   }
 
+  type TaskInstance {
+    done: Boolean
+    title: String
+    id: ID!
+  }
+
+  type SuccessResponse {
+    message: String
+    success: Boolean!
+  }
+
+  type Mutation {
+		addTask(title: String!): SuccessResponse 
+	}
+
   # The "Query" type is special: it lists all of the available queries that
   # clients can execute, along with the return type for each. In this
   # case, the "books" query returns an array of zero or more Books (defined above).
   type Query {
     books: [Book]
+    taskInstances: [TaskInstance]
+    tasks: [TaskInstance]
   }`;
 const resolvers = {
     Query: {
         books: () => books,
+        tasks: async () => (await db.collection("tasks").find().toArray()).map(_ => { return Object.assign(Object.assign({}, _), { id: _._id }); }),
     },
+    Mutation: {
+        addTask: async (_, { title }) => {
+            const tasks = db.collection("tasks");
+            const doc = {
+                title,
+            };
+            try {
+                const result = await tasks.insertOne(doc);
+            }
+            catch (_a) {
+                return {
+                    success: false,
+                    message: 'failed adding a task',
+                };
+            }
+            return {
+                success: true,
+                message: 'task',
+                task: [tasks],
+            };
+        }
+    }
 };
 // The ApolloServer constructor requires two parameters: your schema
 // definition and your set of resolvers.
@@ -55,6 +90,10 @@ const server = new ApolloServer({
     resolvers,
 });
 const getUser = token => {
+    if (DEPLOYMENT === 'development') {
+        return process.env.USER;
+        ;
+    }
     try {
         if (token) {
             return jwt.verify(token, JWT_SECRET);
@@ -67,13 +106,9 @@ const getUser = token => {
 };
 startStandaloneServer(server, {
     listen: { port: APP_PORT },
-    context: ({ req }) => __awaiter(void 0, void 0, void 0, function* () {
+    context: async ({ req }) => {
         const token = req.headers.authorization || '';
         const user = getUser(token);
-        if (DEPLOYMENT === 'development') {
-            return process.env.USERUSER;
-            ;
-        }
         if (!user)
             throw new GraphQLError('User is not authenticated', {
                 extensions: {
@@ -82,6 +117,6 @@ startStandaloneServer(server, {
                 },
             });
         return { user };
-    })
+    }
 });
 //# sourceMappingURL=index.js.map
