@@ -2,7 +2,10 @@ import { ApolloServer } from '@apollo/server';
 import { startStandaloneServer } from '@apollo/server/standalone';
 import { GraphQLError } from 'graphql';
 import jwt from 'jsonwebtoken';
-const JWT_SECRET = '123';
+import 'dotenv/config';
+const JWT_SECRET = process.env.JWT_SECRET;
+const DEPLOYMENT = process.env.DEPLOYMENT;
+const APP_PORT = process.env.PORT;
 const books = [
     {
         title: 'The Awakening',
@@ -54,10 +57,13 @@ const getUser = token => {
     }
 };
 const { url } = await startStandaloneServer(server, {
-    listen: { port: 4000 },
+    listen: { port: APP_PORT },
     context: async ({ req }) => {
         const token = req.headers.authorization || '';
         const user = getUser(token);
+        if (DEPLOYMENT === 'development') {
+            return process.env.USER;
+        }
         if (!user)
             throw new GraphQLError('User is not authenticated', {
                 extensions: {
@@ -68,5 +74,4 @@ const { url } = await startStandaloneServer(server, {
         return { user };
     }
 });
-console.log(`🚀  Server ready at: ${url}`);
 //# sourceMappingURL=index.js.map
