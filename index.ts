@@ -68,14 +68,14 @@ const getUser = token => {
     }
 }
 
-const { url }  = await startStandaloneServer(server, {
+startStandaloneServer(server, {
     listen: { port: APP_PORT },
     context: async ({ req }) => {
 
       const token = req.headers.authorization || '';
       const user = getUser(token);
       if (DEPLOYMENT === 'development') { 
-        return process.env.USER;
+        return process.env.USERUSER;;
       }
       if (!user)
         throw new GraphQLError('User is not authenticated', {
