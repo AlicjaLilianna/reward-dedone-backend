@@ -5,8 +5,11 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "npx tsc -t es2022 -m es2022 --moduleResolution node && node dist/index.js",
-    "postinstall": "tsc"
+    "start": "node dist/index.js",
+    "watch-node": "nodemon dist/index.js",
+    "watch-ts": "tsc -w",
+    "postinstall": "tsc",
+    "deploy": "git push heroku main; git push"
   },
   "keywords": [],
   "author": "",
