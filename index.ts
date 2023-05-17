@@ -1,6 +1,10 @@
 import { ApolloServer } from '@apollo/server';
 
 import { startStandaloneServer } from '@apollo/server/standalone';
+import { GraphQLError } from 'graphql';
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = '123';
 
 const books = [
   {
@@ -50,9 +54,34 @@ const server = new ApolloServer({
   resolvers,
 });
 
+const getUser = token => {
+    try {
+        if (token) {
+            return jwt.verify(token, JWT_SECRET)
+        }
+        return null
+    } catch (error) {
+        return null
+    }
+}
 
-const { url } = await startStandaloneServer(server, {
-  listen: { port: 4000 },
-});
+const { url }  = await startStandaloneServer(server, {
+    listen: { port: 4000 },
+    context: async ({ req }) => {
+
+      const token = req.headers.authorization || '';
+      const user = getUser(token);
+
+      if (!user)
+        throw new GraphQLError('User is not authenticated', {
+          extensions: {
+            code: 'UNAUTHENTICATED',
+            http: { status: 401 },
+          },
+        });
+
+      return { user };
+    }
+  });
 
 console.log(`🚀  Server ready at: ${url}`);
