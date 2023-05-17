@@ -58,6 +58,9 @@ const server = new ApolloServer({
 });
 
 const getUser = token => {
+    if (DEPLOYMENT === 'development') { 
+      return process.env.USER;;
+    }
     try {
         if (token) {
             return jwt.verify(token, JWT_SECRET)
@@ -74,9 +77,6 @@ startStandaloneServer(server, {
 
       const token = req.headers.authorization || '';
       const user = getUser(token);
-      if (DEPLOYMENT === 'development') { 
-        return process.env.USERUSER;;
-      }
       if (!user)
         throw new GraphQLError('User is not authenticated', {
           extensions: {
