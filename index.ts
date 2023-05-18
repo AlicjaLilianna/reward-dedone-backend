@@ -39,10 +39,17 @@ const typeDefs = `#graphql
     author: String
   }
 
-  type TaskInstance {
+  type Task {
     done: Boolean
-    title: String
+    title: String!
     id: ID!
+    points: Int!
+    importance: Int!
+  }
+
+  type UserInfo {
+    points: Int!
+    profilePicture: String
   }
 
   type SuccessResponse {
@@ -50,39 +57,81 @@ const typeDefs = `#graphql
     success: Boolean!
   }
 
+  enum Importance {
+    low,
+    normal,
+    high,
+    uber_high
+  }
+
   type Mutation {
-		addTask(title: String!): SuccessResponse 
+		addTask(title: String!, points: Int!, importance: Importance): SuccessResponse 
+    deleteTask(id: ID!): SuccessResponse
+    editTask(id: ID!, title: String, points: Int, importance: Int): SuccessResponse
+    completeTask(id: ID!): SuccessResponse
+    addReward(title: String!, points: Int!): SuccessResponse
+    deleteReward(id: ID!): SuccessResponse
+    editReward(id: ID!, title: String, points: Int): SuccessResponse
+    buyReward(id: ID!): SuccessResponse
 	}
+
+  type Reward {
+    id: ID!
+    title: String!
+    points: Int!
+  }
 
   # The "Query" type is special: it lists all of the available queries that
   # clients can execute, along with the return type for each. In this
   # case, the "books" query returns an array of zero or more Books (defined above).
   type Query {
     books: [Book]
-    taskInstances: [TaskInstance]
-    tasks: [TaskInstance]
+    tasks: [Task]
+    rewards: [Reward]
+    user_info: UserInfo
   }`
 
 const resolvers = {
   Query: {
     books: () => books,
     tasks: async () => (await db.collection("tasks").find().toArray()).map(_ => { return { ..._, id: _._id } }),
+    rewards: async () => (await db.collection("rewards").find().toArray()).map(_ => { return { ..._, id: _._id } }),
+    user_info: async () => (await db.collection("user_info").find().toArray()),
   },
   Mutation: {
-    addTask: async (_, { title }) => {
-      const tasks = db.collection("tasks");
-      const doc = {
-        title,
+    deleteTask: async (_, { id }) => { await db.collection("tasks").deleteOne({ _id: id }) },
+    editTask: async (_, args) => { const { id, ...rest } = args; await db.collection("tasks").updateOne({ _id: id }, { $set: rest }) },
+    completeTask: async (_, { id }) => { await db.collection("tasks").updateOne({ _id: id }, { $set: { done: true } }) },
+    addReward: async (_, args) => {
+      const rewards = db.collection("rewards");
+      const result = await rewards.insertOne(args);
+      return {
+        success: true,
+        message: 'added a reward',
       };
-      try {
-        const result = await tasks.insertOne(doc);
-      } catch {
+
+    },
+    deleteReward: async (_, { id }) => { await db.collection("rewards").deleteOne({ _id: id }) },
+    editReward: async (_, args) => { const { id, ...rest } = args; await db.collection("rewards").updateOne({ _id: id }, { $set: rest }) },
+    buyReward: async (_, { id }, context) => {
+      const user_info = await db.collection("users").findOne({ _id: context.user_id });
+      const reward = await db.collection("rewards").findOne({ $_id: id });
+      if (user_info.points >= reward.points) {
+        await db.collection("users").updateOne({ _id: context.user_id }, { $set: { points: user_info.points - reward.points } });
+        return {
+          success: true,
+          message: 'bought a reward',
+        };
+      } else {
         return {
           success: false,
-          message: 'failed adding a task',
+          message: 'not enough points to buy reward',
         };
-
       }
+    },
+    addTask: async (_, args) => {
+      const tasks = db.collection("tasks");
+      const result = await tasks.insertOne(args);
       return {
         success: true,
         message: 'task',
@@ -130,6 +179,23 @@ startStandaloneServer(server, {
         },
       });
 
-    return { user };
+    const mail = user.email;
+    if (!mail) {
+      throw new GraphQLError('User is not authenticated', {
+        extensions: {
+          code: 'UNAUTHENTICATED',
+          http: { status: 401 },
+        },
+      });
+    }
+
+    const db_user = await db.collection("user").findOne({ email: mail });
+    let db_user_id = null;
+    if (!db_user) {
+      const { insertedId: _id } = await db.collection("user").insertOne({ email: mail });
+      db_user_id = _id;
+    }
+    else { db_user_id = db_user._id }
+    return { user, user_id: db_user_id };
   }
 });
