@@ -14,31 +14,12 @@ const MONGO_URI = process.env.MONGODB_URI;
 const client = new MongoClient(MONGO_URI);
 const db = client.db("task_db");
 
-const books = [
-  {
-    title: 'The Awakening',
-    author: 'Kate Chopin',
-  },
-  {
-    title: 'City of Glass',
-    author: 'Paul Auster',
-  },
-
-];
-
 // A schema is a collection of type definitions (hence "typeDefs")
 // that together define the "shape" of queries that are executed against
 // your data.
 
 const typeDefs = `#graphql
   # Comments in GraphQL strings (such as this one) start with the hash (#) symbol.
-  # This "Book" type defines the queryable fields for every book in our data source.
-
-  type Book {
-    title: String
-    author: String
-  }
-
   type Task {
     done: Boolean
     title: String!
@@ -81,11 +62,7 @@ const typeDefs = `#graphql
     points: Int!
   }
 
-  # The "Query" type is special: it lists all of the available queries that
-  # clients can execute, along with the return type for each. In this
-  # case, the "books" query returns an array of zero or more Books (defined above).
   type Query {
-    books: [Book]
     tasks: [Task]
     rewards: [Reward]
     user_info: UserInfo
@@ -93,7 +70,6 @@ const typeDefs = `#graphql
 
 const resolvers = {
   Query: {
-    books: () => books,
     tasks: async () => (await db.collection("tasks").find().toArray()).map(_ => { return { ..._, id: _._id } }),
     rewards: async () => (await db.collection("rewards").find().toArray()).map(_ => { return { ..._, id: _._id } }),
     user_info: async () => (await db.collection("user_info").find().toArray()),
@@ -153,7 +129,7 @@ const server = new ApolloServer({
 
 const getUser = token => {
   if (DEPLOYMENT === 'development') {
-    return process.env.USER;;
+    return { email: process.env.USER };
   }
   try {
     if (token) {
@@ -164,6 +140,7 @@ const getUser = token => {
     return null
   }
 }
+
 
 startStandaloneServer(server, {
   listen: { port: APP_PORT },
@@ -192,10 +169,11 @@ startStandaloneServer(server, {
     const db_user = await db.collection("user").findOne({ email: mail });
     let db_user_id = null;
     if (!db_user) {
-      const { insertedId: _id } = await db.collection("user").insertOne({ email: mail });
+      const { insertedId: _id } = await db.collection("user").insertOne({ email: mail, points: 0 });
       db_user_id = _id;
+    } else {
+      db_user_id = db_user._id
     }
-    else { db_user_id = db_user._id }
     return { user, user_id: db_user_id };
   }
 });
