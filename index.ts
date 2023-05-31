@@ -4,7 +4,7 @@ import { startStandaloneServer } from '@apollo/server/standalone';
 import { GraphQLError } from 'graphql';
 import jwt from 'jsonwebtoken';
 import 'dotenv/config'
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const DEPLOYMENT = process.env.DEPLOYMENT;
@@ -23,7 +23,7 @@ const typeDefs = `#graphql
   type Task {
     done: Boolean
     title: String!
-    id: ID!
+    id: new ObjectId(id)!
     points: Int!
     importance: Int!
   }
@@ -47,17 +47,17 @@ const typeDefs = `#graphql
 
   type Mutation {
 		addTask(title: String!, points: Int!, importance: Importance): SuccessResponse 
-    deleteTask(id: ID!): SuccessResponse
-    editTask(id: ID!, title: String, points: Int, importance: Int): SuccessResponse
-    completeTask(id: ID!): SuccessResponse
+    deleteTask(id: new ObjectId(id)!): SuccessResponse
+    editTask(id: new ObjectId(id)!, title: String, points: Int, importance: Int): SuccessResponse
+    completeTask(id: new ObjectId(id)!): SuccessResponse
     addReward(title: String!, points: Int!): SuccessResponse
-    deleteReward(id: ID!): SuccessResponse
-    editReward(id: ID!, title: String, points: Int): SuccessResponse
-    buyReward(id: ID!): SuccessResponse
+    deleteReward(id: new ObjectId(id)!): SuccessResponse
+    editReward(id: new ObjectId(id)!, title: String, points: Int): SuccessResponse
+    buyReward(id: new ObjectId(id)!): SuccessResponse
 	}
 
   type Reward {
-    id: ID!
+    id: new ObjectId(id)!
     title: String!
     points: Int!
   }
@@ -70,14 +70,20 @@ const typeDefs = `#graphql
 
 const resolvers = {
   Query: {
-    tasks: async () => (await db.collection("tasks").find().toArray()).map(_ => { return { ..._, id: _._id } }),
-    rewards: async () => (await db.collection("rewards").find().toArray()).map(_ => { return { ..._, id: _._id } }),
+    tasks: async () => (await db.collection("tasks").find().toArray()).map(_ => { return { ..._, id: new ObjectId(_._id) } }),
+    rewards: async () => (await db.collection("rewards").find().toArray()).map(_ => { return { ..._, id: new ObjectId(_._id) } }),
     user_info: async () => (await db.collection("user_info").find().toArray()),
   },
   Mutation: {
-    deleteTask: async (_, { id }) => { await db.collection("tasks").deleteOne({ _id: id }) },
-    editTask: async (_, args) => { const { id, ...rest } = args; await db.collection("tasks").updateOne({ _id: id }, { $set: rest }) },
-    completeTask: async (_, { id }) => { await db.collection("tasks").updateOne({ _id: id }, { $set: { done: true } }) },
+    deleteTask: async (_, { id }) => { await db.collection("tasks").deleteOne({ _id: new ObjectId(id) }) },
+    editTask: async (_, args) => { const { id, ...rest } = args; await db.collection("tasks").updateOne({ _id: new ObjectId(id) }, { $set: rest }) },
+    completeTask: async (_, { id }, context) => {
+      await db.collection("tasks").updateOne({ _id: new ObjectId(id) }, { $set: { done: true } })
+      const user_info = await db.collection("users").findOne({ _id: new ObjectId(context.user_id) });
+      const task = await db.collection("tasks").findOne({ _id: new ObjectId(id) });
+      await db.collection("users").updateOne({ _id: new ObjectId(context.user_id) }, { $set: { points: user_info.points + task.points } });
+
+    },
     addReward: async (_, args) => {
       const rewards = db.collection("rewards");
       const result = await rewards.insertOne(args);
@@ -87,13 +93,13 @@ const resolvers = {
       };
 
     },
-    deleteReward: async (_, { id }) => { await db.collection("rewards").deleteOne({ _id: id }) },
-    editReward: async (_, args) => { const { id, ...rest } = args; await db.collection("rewards").updateOne({ _id: id }, { $set: rest }) },
+    deleteReward: async (_, { id }) => { await db.collection("rewards").deleteOne({ _id: new ObjectId(id) }) },
+    editReward: async (_, args) => { const { id, ...rest } = args; await db.collection("rewards").updateOne({ _id: new ObjectId(id) }, { $set: rest }) },
     buyReward: async (_, { id }, context) => {
-      const user_info = await db.collection("users").findOne({ _id: context.user_id });
-      const reward = await db.collection("rewards").findOne({ $_id: id });
+      const user_info = await db.collection("users").findOne({ _id: new ObjectId(context.user_id) });
+      const reward = await db.collection("rewards").findOne({ $_id: new ObjectId(id) });
       if (user_info.points >= reward.points) {
-        await db.collection("users").updateOne({ _id: context.user_id }, { $set: { points: user_info.points - reward.points } });
+        await db.collection("users").updateOne({ _id: new ObjectId(context.user_id) }, { $set: { points: user_info.points - reward.points } });
         return {
           success: true,
           message: 'bought a reward',
