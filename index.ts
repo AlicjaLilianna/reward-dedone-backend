@@ -25,7 +25,7 @@ const typeDefs = `#graphql
     title: String!
     id: ID!
     points: Int!
-    importance: Int!
+    importance: Importance!
   }
 
   type UserInfo {
@@ -48,7 +48,7 @@ const typeDefs = `#graphql
   type Mutation {
 		addTask(title: String!, points: Int!, importance: Importance): SuccessResponse 
     deleteTask(id: ID!): SuccessResponse
-    editTask(id: ID!, title: String, points: Int, importance: Int): SuccessResponse
+    editTask(id: ID!, title: String, points: Int, importance: Importance): SuccessResponse
     completeTask(id: ID!): SuccessResponse
     addReward(title: String!, points: Int!): SuccessResponse
     deleteReward(id: ID!): SuccessResponse
@@ -83,6 +83,10 @@ const resolvers = {
       const task = await db.collection("tasks").findOne({ _id: new ObjectId(id) });
       const cur_points = user_info.points ?? 0;
       await db.collection("users").updateOne({ _id: new ObjectId(context.user_id) }, { $set: { points: cur_points + task.points } });
+      return {
+        success: true,
+        message: 'task completed',
+      };
 
     },
     addReward: async (_, args) => {

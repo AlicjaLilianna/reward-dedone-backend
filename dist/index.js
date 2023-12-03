@@ -31,7 +31,7 @@ const typeDefs = `#graphql
     title: String!
     id: ID!
     points: Int!
-    importance: Int!
+    importance: Importance!
   }
 
   type UserInfo {
@@ -54,7 +54,7 @@ const typeDefs = `#graphql
   type Mutation {
 		addTask(title: String!, points: Int!, importance: Importance): SuccessResponse 
     deleteTask(id: ID!): SuccessResponse
-    editTask(id: ID!, title: String, points: Int, importance: Int): SuccessResponse
+    editTask(id: ID!, title: String, points: Int, importance: Importance): SuccessResponse
     completeTask(id: ID!): SuccessResponse
     addReward(title: String!, points: Int!): SuccessResponse
     deleteReward(id: ID!): SuccessResponse
@@ -83,10 +83,16 @@ const resolvers = {
         deleteTask: async (_, { id }) => { await db.collection("tasks").deleteOne({ _id: new ObjectId(id) }); },
         editTask: async (_, args) => { const { id } = args, rest = __rest(args, ["id"]); await db.collection("tasks").updateOne({ _id: new ObjectId(id) }, { $set: rest }); },
         completeTask: async (_, { id }, context) => {
+            var _a;
             await db.collection("tasks").updateOne({ _id: new ObjectId(id) }, { $set: { done: true } });
             const user_info = await db.collection("users").findOne({ _id: new ObjectId(context.user_id) });
             const task = await db.collection("tasks").findOne({ _id: new ObjectId(id) });
-            await db.collection("users").updateOne({ _id: new ObjectId(context.user_id) }, { $set: { points: user_info.points + task.points } });
+            const cur_points = (_a = user_info.points) !== null && _a !== void 0 ? _a : 0;
+            await db.collection("users").updateOne({ _id: new ObjectId(context.user_id) }, { $set: { points: cur_points + task.points } });
+            return {
+                success: true,
+                message: 'task completed',
+            };
         },
         addReward: async (_, args) => {
             const rewards = db.collection("rewards");
