@@ -81,7 +81,8 @@ const resolvers = {
       await db.collection("tasks").updateOne({ _id: new ObjectId(id) }, { $set: { done: true } })
       const user_info = await db.collection("users").findOne({ _id: new ObjectId(context.user_id) });
       const task = await db.collection("tasks").findOne({ _id: new ObjectId(id) });
-      await db.collection("users").updateOne({ _id: new ObjectId(context.user_id) }, { $set: { points: user_info.points + task.points } });
+      const cur_points = user_info.points ?? 0;
+      await db.collection("users").updateOne({ _id: new ObjectId(context.user_id) }, { $set: { points: cur_points + task.points } });
 
     },
     addReward: async (_, args) => {

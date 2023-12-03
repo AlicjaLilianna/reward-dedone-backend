@@ -29,7 +29,7 @@ const typeDefs = `#graphql
   type Task {
     done: Boolean
     title: String!
-    id: new ObjectId(id)!
+    id: ID!
     points: Int!
     importance: Int!
   }
@@ -53,17 +53,17 @@ const typeDefs = `#graphql
 
   type Mutation {
 		addTask(title: String!, points: Int!, importance: Importance): SuccessResponse 
-    deleteTask(id: new ObjectId(id)!): SuccessResponse
-    editTask(id: new ObjectId(id)!, title: String, points: Int, importance: Int): SuccessResponse
-    completeTask(id: new ObjectId(id)!): SuccessResponse
+    deleteTask(id: ID!): SuccessResponse
+    editTask(id: ID!, title: String, points: Int, importance: Int): SuccessResponse
+    completeTask(id: ID!): SuccessResponse
     addReward(title: String!, points: Int!): SuccessResponse
-    deleteReward(id: new ObjectId(id)!): SuccessResponse
-    editReward(id: new ObjectId(id)!, title: String, points: Int): SuccessResponse
-    buyReward(id: new ObjectId(id)!): SuccessResponse
+    deleteReward(id: ID!): SuccessResponse
+    editReward(id: ID!, title: String, points: Int): SuccessResponse
+    buyReward(id: ID!): SuccessResponse
 	}
 
   type Reward {
-    id: new ObjectId(id)!
+    id: ID!
     title: String!
     points: Int!
   }
