@@ -77,7 +77,7 @@ const resolvers = {
     Query: {
         tasks: async () => (await db.collection("tasks").find().toArray()).map(_ => { return Object.assign(Object.assign({}, _), { id: new ObjectId(_._id) }); }),
         rewards: async () => (await db.collection("rewards").find().toArray()).map(_ => { return Object.assign(Object.assign({}, _), { id: new ObjectId(_._id) }); }),
-        user_info: async () => (await db.collection("user_info").find().toArray()),
+        user_info: async (_, __, context) => (await db.collection("user").findOne({ _id: new ObjectId(context.user_id) })),
     },
     Mutation: {
         deleteTask: async (_, { id }) => { await db.collection("tasks").deleteOne({ _id: new ObjectId(id) }); },
@@ -85,10 +85,10 @@ const resolvers = {
         completeTask: async (_, { id }, context) => {
             var _a;
             await db.collection("tasks").updateOne({ _id: new ObjectId(id) }, { $set: { done: true } });
-            const user_info = await db.collection("users").findOne({ _id: new ObjectId(context.user_id) });
+            const user_info = await db.collection("user").findOne({ _id: new ObjectId(context.user_id) });
             const task = await db.collection("tasks").findOne({ _id: new ObjectId(id) });
             const cur_points = (_a = user_info.points) !== null && _a !== void 0 ? _a : 0;
-            await db.collection("users").updateOne({ _id: new ObjectId(context.user_id) }, { $set: { points: cur_points + task.points } });
+            await db.collection("user").updateOne({ _id: new ObjectId(context.user_id) }, { $set: { points: cur_points + task.points } });
             return {
                 success: true,
                 message: 'task completed',
@@ -105,10 +105,10 @@ const resolvers = {
         deleteReward: async (_, { id }) => { await db.collection("rewards").deleteOne({ _id: new ObjectId(id) }); },
         editReward: async (_, args) => { const { id } = args, rest = __rest(args, ["id"]); await db.collection("rewards").updateOne({ _id: new ObjectId(id) }, { $set: rest }); },
         buyReward: async (_, { id }, context) => {
-            const user_info = await db.collection("users").findOne({ _id: new ObjectId(context.user_id) });
-            const reward = await db.collection("rewards").findOne({ $_id: new ObjectId(id) });
+            const user_info = await db.collection("user").findOne({ _id: new ObjectId(context.user_id) });
+            const reward = await db.collection("rewards").findOne({ _id: new ObjectId(id) });
             if (user_info.points >= reward.points) {
-                await db.collection("users").updateOne({ _id: new ObjectId(context.user_id) }, { $set: { points: user_info.points - reward.points } });
+                await db.collection("user").updateOne({ _id: new ObjectId(context.user_id) }, { $set: { points: user_info.points - reward.points } });
                 return {
                     success: true,
                     message: 'bought a reward',
@@ -123,11 +123,11 @@ const resolvers = {
         },
         addTask: async (_, args) => {
             const tasks = db.collection("tasks");
-            const result = await tasks.insertOne(args);
+            const result = await tasks.insertOne(Object.assign(Object.assign({}, args), { done: false }));
             return {
                 success: true,
                 message: 'task',
-                task: [tasks],
+                task: [tasks]
             };
         }
     }
@@ -137,6 +137,7 @@ const resolvers = {
 const server = new ApolloServer({
     typeDefs,
     resolvers,
+    introspection: true,
 });
 const getUser = token => {
     if (DEPLOYMENT === 'development') {
