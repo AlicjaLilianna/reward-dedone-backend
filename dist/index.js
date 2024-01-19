@@ -84,11 +84,12 @@ const resolvers = {
         editTask: async (_, args) => { const { id } = args, rest = __rest(args, ["id"]); await db.collection("tasks").updateOne({ _id: new ObjectId(id) }, { $set: rest }); },
         completeTask: async (_, { id }, context) => {
             var _a;
-            await db.collection("tasks").updateOne({ _id: new ObjectId(id) }, { $set: { done: true } });
             const user_info = await db.collection("user").findOne({ _id: new ObjectId(context.user_id) });
             const task = await db.collection("tasks").findOne({ _id: new ObjectId(id) });
             const cur_points = (_a = user_info.points) !== null && _a !== void 0 ? _a : 0;
-            await db.collection("user").updateOne({ _id: new ObjectId(context.user_id) }, { $set: { points: cur_points + task.points } });
+            const new_points = cur_points + (!task.done ? 1 : -1) * task.points;
+            await db.collection("tasks").updateOne({ _id: new ObjectId(id) }, { $set: { done: !task.done } });
+            await db.collection("user").updateOne({ _id: new ObjectId(context.user_id) }, { $set: { points: Math.max(0, new_points) } });
             return {
                 success: true,
                 message: 'task completed',
